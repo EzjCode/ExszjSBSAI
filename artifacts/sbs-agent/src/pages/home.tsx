@@ -311,7 +311,7 @@ export default function Home() {
                       <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                         <Sparkles className="h-3 w-3 text-white" />
                       </div>
-                      <span className="text-xs font-medium text-muted-foreground">SBS Assistant</span>
+                      <span className="text-xs font-medium text-muted-foreground">Exszj (SBS Assistant)</span>
                     </div>
                     <div className="bg-card border shadow-sm p-5 rounded-2xl rounded-tl-sm max-w-[90%] w-full">
                       <div className="prose prose-sm max-w-none text-foreground mb-4 whitespace-pre-wrap">

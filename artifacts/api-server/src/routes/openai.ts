@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { conversations, messages } from "@workspace/db";
+import { conversations, messages, spielsTable } from "@workspace/db";
 import {
   CreateOpenaiConversationBody,
   GetOpenaiConversationParams,
@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const SBS_SYSTEM_PROMPT = `You are a Senior SBS (Service by Shopee) Agent for an Official Store. Your job is to generate a ready-to-use customer service spiel (response) based on the customer's message provided by the agent.
+const SBS_BASE_PROMPT = `You are a Senior SBS (Service by Shopee) Agent for an Official Store. Your job is to generate a ready-to-use customer service spiel (response) based on the customer's message provided by the agent.
 
 LANGUAGE RULES (strictly follow):
 - If the customer's message is in TAGALOG or mixed Tagalog-English (Taglish), respond with 70% English and 30% Tagalog naturally woven together.
@@ -41,10 +41,45 @@ HOUSE RULES (follow all strictly):
 7. VOUCHERS: If a buyer says the price is too expensive, suggest they check the shop's main page for Follow Vouchers, Add-on Deals, or Shopee vouchers during sale events.
 8. OUT OF STOCK: Apologize sincerely. If possible, suggest a similar alternative from the shop.
 
+HOW TO USE THE SPIEL LIBRARY:
+Below is a library of approved spiels organized by category and title. Each title tells you WHEN to use that spiel (e.g. "Checking", "Opening Spiel", "Irate Customer", "Shipment Estimation", "Order Discontinuation", "Outside DTS", etc.).
+- Read the customer's concern carefully and identify which category/title applies.
+- Use the matching spiel as your BASE — keep its wording and tone as close as possible.
+- Adapt only the parts that need to be personalized (order details, item names, dates, etc.).
+- You may combine multiple spiels if more than one applies (e.g. opening + apology + closing).
+- If no spiel exactly matches, use the closest one and adapt it naturally.
+- ALWAYS prioritize using a spiel from the library over making one up from scratch.
+
 RESPONSE FORMAT:
 - Output ONLY the ready-to-use spiel text — no preamble, no meta-commentary, no "Here is a spiel:".
 - Always end with the standard closing: "Is there anything else I can help you with? Don't forget to follow our shop for updates! Happy Shopee-ing! 🧡"
 - The spiel should be copy-paste ready for the agent to send directly to the customer.`;
+
+async function buildSystemPrompt(): Promise<string> {
+  const spiels = await db
+    .select()
+    .from(spielsTable)
+    .orderBy(spielsTable.category, spielsTable.title);
+
+  if (spiels.length === 0) return SBS_BASE_PROMPT;
+
+  const grouped: Record<string, { title: string; content: string }[]> = {};
+  for (const s of spiels) {
+    if (!grouped[s.category]) grouped[s.category] = [];
+    grouped[s.category].push({ title: s.title, content: s.content });
+  }
+
+  let spielLibrary = "\n\n--- APPROVED SPIEL LIBRARY ---\n";
+  for (const [category, entries] of Object.entries(grouped)) {
+    spielLibrary += `\n[${category.toUpperCase()}]\n`;
+    for (const entry of entries) {
+      spielLibrary += `• ${entry.title}: "${entry.content}"\n`;
+    }
+  }
+  spielLibrary += "\n--- END OF SPIEL LIBRARY ---";
+
+  return SBS_BASE_PROMPT + spielLibrary;
+}
 
 router.get("/conversations", async (req, res) => {
   try {
@@ -123,10 +158,16 @@ router.post("/conversations/:id/messages", async (req, res) => {
       content: body.content,
     });
 
-    const history = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(messages.createdAt);
+    const history = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, id))
+      .orderBy(messages.createdAt);
+
+    const systemPrompt = await buildSystemPrompt();
 
     const chatMessages = [
-      { role: "system" as const, content: SBS_SYSTEM_PROMPT },
+      { role: "system" as const, content: systemPrompt },
       ...history.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,

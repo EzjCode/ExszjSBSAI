@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Plus, Search, Trash2, Edit2, Copy, MoreVertical, Library, BookOpen } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Copy, MoreVertical, Library, BookOpen, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -17,19 +17,82 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+const SPIELS_PASSWORD = "@ejrayco2007";
+const AUTH_KEY = "sbs_spiels_unlocked";
+
+function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const { toast } = useToast();
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === SPIELS_PASSWORD) {
+      sessionStorage.setItem(AUTH_KEY, "1");
+      onUnlock();
+    } else {
+      toast({
+        title: "Incorrect password",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      setPassword("");
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center h-full bg-muted/20 p-6">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-card border rounded-2xl shadow-sm p-8 w-full max-w-md flex flex-col items-center gap-5"
+      >
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Lock className="h-7 w-7 text-primary" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-xl font-bold tracking-tight">Saved Spiels Locked</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Enter the password to access the spiel library.
+          </p>
+        </div>
+        <div className="w-full space-y-2">
+          <Label htmlFor="spiels-password">Password</Label>
+          <Input
+            id="spiels-password"
+            type="password"
+            placeholder="Enter password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={!password}>
+          Unlock
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function Spiels() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  
+  const [unlocked, setUnlocked] = useState<boolean>(
+    () => typeof window !== "undefined" && sessionStorage.getItem(AUTH_KEY) === "1"
+  );
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSpiel, setEditingSpiel] = useState<{ id?: number, title: string, category: string, content: string } | null>(null);
 
-  const { data: spiels = [], isLoading } = useListSpiels();
+  const { data: spiels = [], isLoading } = useListSpiels({ query: { enabled: unlocked } });
   const createSpiel = useCreateSpiel();
   const updateSpiel = useUpdateSpiel();
   const deleteSpiel = useDeleteSpiel();
+
+  if (!unlocked) {
+    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  }
 
   const categories = Array.from(new Set(spiels.map(s => s.category))).filter(Boolean);
   

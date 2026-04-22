@@ -69,12 +69,12 @@ export function AppSidebar() {
               <div className="flex items-center gap-3 cursor-pointer">
                 <Avatar className="h-8 w-8 rounded-md">
                   <AvatarFallback className="bg-primary/10 text-primary rounded-md">
-                    AG
+                    EX
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col group-data-[collapsible=icon]:hidden overflow-hidden">
                   <span className="text-sm font-medium leading-none truncate">
-                    Agent Smith
+                    Exszj AI
                   </span>
                   <span className="text-xs text-muted-foreground truncate mt-1">
                     Level 2 Support
